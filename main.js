@@ -3,6 +3,7 @@ const { HDKey } = require("micro-ed25519-hdkey");
 const bip39 = require("bip39");
 const fs = require("fs");
 const path = require("path");
+const bs58 = require('bs58'); // Подключаем библиотеку для работы с Base58
 const readline = require("readline");
 process.removeAllListeners('warning');
 
@@ -10,28 +11,29 @@ process.removeAllListeners('warning');
 const addressFilePath = path.resolve(__dirname, "address.txt");
 const addressStream = fs.createWriteStream(addressFilePath, { flags: "a" });
 
-// Функция для генерации адреса из мнемонической фразы
+
 function generateFromMnemonic(mnemonic) {
-    // Проверка на пустую строку и валидность мнемонической фразы
-    if (!mnemonic || !bip39.validateMnemonic(mnemonic)) {
-      console.log(`Invalid or empty mnemonic: ${mnemonic}`);
-      return; // Выход из функции, если мнемоническая фраза недействительна
+    // Проверка на валидность мнемонической фразы
+    if (!bip39.validateMnemonic(mnemonic)) {
+        console.log(`Invalid mnemonic: ${mnemonic}`);
+        return; // Выход из функции, если мнемоническая фраза недействительна
     }
-  
+
     const seed = bip39.mnemonicToSeedSync(mnemonic, "");
     const hd = HDKey.fromMasterSeed(seed.toString("hex"));
-  
+
     const derivationPath = `m/44'/501'/0'/0'`;
     const derivedKey = hd.derive(derivationPath);
-  
+
     const keypair = Keypair.fromSeed(derivedKey.privateKey);
-    const privateKey = Buffer.from(keypair.secretKey).toString("hex");
+    const privateKeyHex = Buffer.from(keypair.secretKey).toString("hex");
+    const privateKeyBase58 = bs58.encode(Buffer.from(privateKeyHex, 'hex')); // Приводим приватный ключ к Base58
     const publicKey = keypair.publicKey.toBase58();
-  
+
     // Запись в файл в формате privateKey:address
-    addressStream.write(`${mnemonic}:${privateKey}:${publicKey}\n`);
+    addressStream.write(`${mnemonic}:${privateKeyBase58}:${publicKey}\n`);
     console.log(`Address from mnemonic: ${publicKey}`);
-  }
+}
   
 // Функция для генерации адреса из приватного ключа
 function generateFromPrivateKey(privateKeyHex) {
